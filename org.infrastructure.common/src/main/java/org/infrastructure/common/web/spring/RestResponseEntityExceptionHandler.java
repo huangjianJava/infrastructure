@@ -1,6 +1,5 @@
 package org.infrastructure.common.web.spring;
 
-
 import org.infrastructure.common.exception.ControllerException;
 import org.infrastructure.common.exception.DaoException;
 import org.infrastructure.common.exception.ServiceException;
@@ -13,6 +12,7 @@ import org.infrastructure.result.ResultDataConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpHeaders;
@@ -36,16 +36,20 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 异常处理器,该类会处理所有在执行标有@RequestMapping注解的方法时发生的异常.
- * 
+ * 异常处理父类
+ * 该类会处理所有在执行标有@RequestMapping注解的方法时发生的异常.
  */
 @ControllerAdvice
 public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionHandler {
 
     protected Logger log = LoggerFactory.getLogger(getClass());
 
+    /**
+     * 消息处理(入参校验)
+     * ResourceBundleMessageSource 注入失败
+     */
     @Autowired
-    private ResourceBundleMessageSource messageSource;
+    private MessageSource messageSource;
 
     public RestResponseEntityExceptionHandler() {
         super();
@@ -53,57 +57,55 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
 
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<Object> defaultErrorHandler(final Exception ex,
-            final WebRequest request) {
+                                                      final WebRequest request) {
         log.error("500 Status Code", ex);
-
         final ResultData<?> apiError = message(ex);
-
         return handleExceptionInternal(ex, apiError, new HttpHeaders(),
                 HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
-    
+
     @ExceptionHandler({UnauthorizedException.class})
     public ResponseEntity<Object> handleUnauthorization(final UnauthorizedException ex,
-        final WebRequest request) {
-      logger.error("401 Status Code", ex);
+                                                        final WebRequest request) {
+        logger.error("401 Status Code", ex);
 
-      ResultData<String> authObj = ResultData.createAuthFailResult();
-      if (ex.getCodeEx() !=null) {
-          if (ex.getCodeEx() == ResultDataConstants.TOKEN_LOST) {
-              authObj = ResultData.createTokenLoseResult();
-          }
-          if (ex.getCodeEx() == ResultDataConstants.TOKEN_KICK) {
-              authObj = ResultData.createTokenKickResult();
-          }
-      }
+        ResultData<String> authObj = ResultData.createAuthFailResult();
+        if (ex.getCodeEx() != null) {
+            if (ex.getCodeEx() == ResultDataConstants.TOKEN_LOST) {
+                authObj = ResultData.createTokenLoseResult();
+            }
+            if (ex.getCodeEx() == ResultDataConstants.TOKEN_KICK) {
+                authObj = ResultData.createTokenKickResult();
+            }
+        }
 
-      return handleExceptionInternal(ex, authObj, new HttpHeaders(), HttpStatus.OK, request);
+        return handleExceptionInternal(ex, authObj, new HttpHeaders(), HttpStatus.OK, request);
     }
-    
+
     @ExceptionHandler({ServiceException.class})
     public ResponseEntity<Object> handleServiceException(final ServiceException ex,
-        final WebRequest request) {
-      logger.error("handleServiceException", ex);
+                                                         final WebRequest request) {
+        logger.error("handleServiceException", ex);
 
-      return handleExceptionInternal(ex,  message(ex) , new HttpHeaders(), HttpStatus.OK, request);
+        return handleExceptionInternal(ex, message(ex), new HttpHeaders(), HttpStatus.OK, request);
     }
-    
+
     @ExceptionHandler({ControllerException.class})
     public ResponseEntity<Object> handleControllerException(final ControllerException ex,
-        final WebRequest request) {
-      logger.error("handleControllerException", ex);
+                                                            final WebRequest request) {
+        logger.error("handleControllerException", ex);
 
-      return handleExceptionInternal(ex,  message(ex) , new HttpHeaders(), HttpStatus.OK, request);
+        return handleExceptionInternal(ex, message(ex), new HttpHeaders(), HttpStatus.OK, request);
     }
-    
+
     @ExceptionHandler({DaoException.class})
     public ResponseEntity<Object> handleDaoException(final DaoException ex,
-        final WebRequest request) {
-      logger.error("handleDaoException", ex);
+                                                     final WebRequest request) {
+        logger.error("handleDaoException", ex);
 
-      return handleExceptionInternal(ex,  message(ex) , new HttpHeaders(), HttpStatus.OK, request);
+        return handleExceptionInternal(ex, message(ex), new HttpHeaders(), HttpStatus.OK, request);
     }
-    
+
     // 500
     @ExceptionHandler({NullPointerException.class, IllegalArgumentException.class,
             IllegalStateException.class})
@@ -148,7 +150,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
 
     @ExceptionHandler(value = {ConstraintViolationException.class})
     public final ResponseEntity<Object> handleBadRequest(final ConstraintViolationException ex,
-            final WebRequest request) {
+                                                         final WebRequest request) {
         log.error("422 Status Code", ex);
         log.debug("Violation exception: {}", ex.getLocalizedMessage());
 
@@ -162,7 +164,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     // 403
     @ExceptionHandler({AccessDeniedException.class})
     public ResponseEntity<Object> handleEverything(final AccessDeniedException ex,
-            final WebRequest request) {
+                                                   final WebRequest request) {
         log.error("403 Status Code", ex);
 
         final ResultData<?> apiError = message(ex);
@@ -173,7 +175,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     // 404
     @ExceptionHandler({MyResourceNotFoundException.class})
     protected ResponseEntity<Object> handleNotFound(final RuntimeException ex,
-            final WebRequest request) {
+                                                    final WebRequest request) {
         log.error("Not Found: {}", ex.getMessage());
 
         final ResultData<?> apiError = message(ex);
@@ -206,9 +208,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, request);
     }
 
-
     // UTIL
-
     private ValidationErrorDTO processFieldErrors(final List<FieldError> fieldErrors) {
         final ValidationErrorDTO dto = new ValidationErrorDTO();
 
@@ -244,15 +244,15 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
         final String message =
                 ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
         final String devMessage = MoreThrowables.getRootCauseStackTraceAsString(ex);
-        
+
         return ResultData.createErrorResult(null, message, devMessage);
     }
-    
+
     protected ResultData<?> message(final RuntimeException ex) {
         final String message =
                 ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
         final String devMessage = MoreThrowables.getRootCauseStackTraceAsString(ex);
-        
+
         return ResultData.createErrorResult(null, message, devMessage);
     }
 }
